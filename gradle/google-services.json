@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "152032431311",
+    "project_id": "swasthyamitra-eda4e",
+    "storage_bucket": "swasthyamitra-eda4e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:152032431311:android:116a478b4f0383ebc9fbba",
+        "android_client_info": {
+          "package_name": "com.example.swasthyamitra"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "152032431311-lrq61l7vovh25i7qinli691gnbr7apa7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBmmtwo5OxSoaBw9H8lJggVG5K2aFLi_yc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "152032431311-lrq61l7vovh25i7qinli691gnbr7apa7.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
