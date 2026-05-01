@@ -10,6 +10,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import okhttp3.*
 import java.io.IOException
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import android.util.Log
 
 class MainActivity : AppCompatActivity() {
 
@@ -44,13 +47,21 @@ class MainActivity : AppCompatActivity() {
         val userId = currentUser.uid
         val userEmail = currentUser.email ?: "Unknown"
 
-        // Fetch User Name
-        db.collection("users").document(userId).get().addOnSuccessListener { doc ->
-            if (doc.exists()) {
-                val name = doc.getString("name") ?: "User"
-                welcomeText.text = "Hello, $name!"
+        // 🔥 Fetch User Name from Firestore first, fallback to SQLite
+        db.collection("users").document(userId).get()
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    val name = doc.getString("name") ?: "User"
+                    welcomeText.text = "Hello, $name!"
+                } else {
+                    val nameFromDb = getNameFromLocal(userEmail)
+                    welcomeText.text = "Hello, $nameFromDb!"
+                }
             }
-        }
+            .addOnFailureListener {
+                val nameFromDb = getNameFromLocal(userEmail)
+                welcomeText.text = "Hello, $nameFromDb!"
+            }
 
         // Load History from SQLite
         loadHistory(userEmail, historyContainer, lastCheckupText)
@@ -58,12 +69,18 @@ class MainActivity : AppCompatActivity() {
         // Check ESP32 Status
         checkEspStatus(connectionStatusButton)
 
+        // Navigation to ProfileActivity for scanning (updated from DashboardActivity)
         startNewScanButton.setOnClickListener {
-            startActivity(Intent(this, ProfileActivity::class.java))
+            val intent = Intent(this, ProfileActivity::class.java)
+            startActivity(intent)
         }
 
         profileButton.setOnClickListener {
             startActivity(Intent(this, ProfileActivity::class.java))
+        }
+
+        connectionStatusButton.setOnClickListener {
+            Toast.makeText(this, "Disconnected", Toast.LENGTH_LONG).show()
         }
 
         logoutButton.setOnClickListener {
@@ -73,6 +90,23 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, LoginActivity::class.java))
             finish()
         }
+    }
+
+    private fun getNameFromLocal(email: String): String {
+        val db = dbHelper.readableDatabase
+        val cursor = db.query(
+            "users",
+            arrayOf("name"),
+            "email = ?",
+            arrayOf(email),
+            null, null, null
+        )
+        var name = "User"
+        if (cursor.moveToFirst()) {
+            name = cursor.getString(0)
+        }
+        cursor.close()
+        return name
     }
 
     private fun loadHistory(email: String, container: LinearLayout, lastCheckupTv: TextView) {
@@ -91,7 +125,6 @@ class MainActivity : AppCompatActivity() {
                 textView.setTextColor(android.graphics.Color.BLACK)
                 container.addView(textView)
                 
-                // Add a simple separator
                 val view = android.view.View(this)
                 view.layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
                 view.setBackgroundColor(android.graphics.Color.LTGRAY)
@@ -109,7 +142,7 @@ class MainActivity : AppCompatActivity() {
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 runOnUiThread {
-                    button.text = "ESP Status: Disconnected"
+                    button.text = "Device Status: Disconnected"
                     button.setTextColor(android.graphics.Color.RED)
                 }
             }

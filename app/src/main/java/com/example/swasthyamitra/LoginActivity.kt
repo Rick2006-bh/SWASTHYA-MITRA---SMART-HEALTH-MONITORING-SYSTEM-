@@ -7,10 +7,14 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.firestore.FirebaseFirestore
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
+    private lateinit var db: FirebaseFirestore
     private lateinit var dbHelper: DatabaseHelper
     private lateinit var progressBar: ProgressBar
 
@@ -19,6 +23,7 @@ class LoginActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
 
         auth = FirebaseAuth.getInstance()
+        db = FirebaseFirestore.getInstance()
         dbHelper = DatabaseHelper(this)
         progressBar = findViewById(R.id.progressBar)
 
@@ -28,7 +33,7 @@ class LoginActivity : AppCompatActivity() {
         val registerText = findViewById<TextView>(R.id.registerText)
 
         loginButton.setOnClickListener {
-            val email = emailEditText.text.toString().trim()
+            val email = emailEditText.text.toString().trim().lowercase()
             val password = passwordEditText.text.toString().trim()
 
             if (email.isEmpty() || password.isEmpty()) {
@@ -38,26 +43,47 @@ class LoginActivity : AppCompatActivity() {
 
             progressBar.visibility = View.VISIBLE
 
-            // Check SQLite first for offline support/requirement
-            if (dbHelper.checkUser(email, password)) {
-                progressBar.visibility = View.GONE
-                loginSuccess(email)
-            } else {
-                // If not in SQLite, try Firebase
-                auth.signInWithEmailAndPassword(email, password)
-                    .addOnCompleteListener(this) { task ->
-                        progressBar.visibility = View.GONE
-                        if (task.isSuccessful) {
+            // Always try Firebase first for cross-device support
+            auth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this) { task ->
+                    progressBar.visibility = View.GONE
+                    if (task.isSuccessful) {
+                        syncUserToLocal(email, password)
+                        loginSuccess(email)
+                    } else {
+                        val exception = task.exception
+                        val errorMessage = when (exception) {
+                            is FirebaseAuthInvalidUserException -> "Account not found. Please register first."
+                            is FirebaseAuthInvalidCredentialsException -> "Incorrect email or password. Please try again."
+                            else -> "Login Failed: ${exception?.message}"
+                        }
+                        
+                        // Check SQLite as fallback for legacy accounts
+                        if (dbHelper.checkUser(email, password)) {
                             loginSuccess(email)
                         } else {
-                            Toast.makeText(this, "Login Failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
                         }
                     }
-            }
+                }
         }
 
         registerText.setOnClickListener {
             startActivity(Intent(this, RegisterActivity::class.java))
+        }
+    }
+
+    private fun syncUserToLocal(email: String, pass: String) {
+        if (!dbHelper.checkUser(email, pass)) {
+            val userId = auth.currentUser?.uid ?: return
+            db.collection("users").document(userId).get().addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    val name = doc.getString("name") ?: ""
+                    val gender = doc.getString("gender") ?: ""
+                    val dob = doc.getString("dob") ?: ""
+                    dbHelper.addUser(name, email, pass, gender, dob)
+                }
+            }
         }
     }
 

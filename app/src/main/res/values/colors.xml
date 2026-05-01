@@ -2,4 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Light Mode Defaults -->
+    <color name="colorBackground">#F4F7FA</color>
+    <color name="colorSurface">#FFFFFF</color>
+    <color name="colorOnBackground">#333333</color>
+    <color name="colorOnSurface">#333333</color>
 </resources>

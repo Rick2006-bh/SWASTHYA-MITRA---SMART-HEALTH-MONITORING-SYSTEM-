@@ -49,7 +49,7 @@ class RegisterActivity : AppCompatActivity() {
 
         registerButton.setOnClickListener {
             val name = nameEditText.text.toString().trim()
-            val email = emailEditText.text.toString().trim()
+            val email = emailEditText.text.toString().trim().lowercase()
             val password = passwordEditText.text.toString().trim()
             val dob = dobEditText.text.toString().trim()
             val selectedGenderId = genderRadioGroup.checkedRadioButtonId
@@ -70,37 +70,42 @@ class RegisterActivity : AppCompatActivity() {
             val genderRadioButton = findViewById<RadioButton>(selectedGenderId)
             val gender = genderRadioButton.text.toString()
 
-            // Save to SQLite (Requirement: Registration using SQLite)
-            val result = dbHelper.addUser(name, email, password, gender, dob)
-            
-            if (result != -1L) {
-                // Sync to Firebase (Requirement: Sync data to Firebase)
-                auth.createUserWithEmailAndPassword(email, password)
-                    .addOnCompleteListener(this) { task ->
-                        if (task.isSuccessful) {
-                            val userId = auth.currentUser?.uid
-                            if (userId != null) {
-                                val user = hashMapOf(
-                                    "name" to name,
-                                    "email" to email,
-                                    "dob" to dob,
-                                    "gender" to gender
-                                )
-                                db.collection("users").document(userId)
-                                    .set(user, SetOptions.merge())
-                            }
+            // 1. Create user in Firebase Authentication
+            auth.createUserWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this) { task ->
+                    if (task.isSuccessful) {
+                        val userId = auth.currentUser?.uid
+                        if (userId != null) {
+                            // 2. Save additional details to Firestore (Cloud)
+                            val user = hashMapOf(
+                                "name" to name,
+                                "email" to email,
+                                "dob" to dob,
+                                "gender" to gender
+                            )
+                            db.collection("users").document(userId)
+                                .set(user, SetOptions.merge())
+                                .addOnSuccessListener {
+                                    // 3. Save to local SQLite as backup
+                                    dbHelper.addUser(name, email, password, gender, dob)
+                                    
+                                    progressBar.visibility = View.GONE
+                                    Toast.makeText(this, "Registration Successful", Toast.LENGTH_SHORT).show()
+                                    startActivity(Intent(this, LoginActivity::class.java))
+                                    finish()
+                                }
+                                .addOnFailureListener { e ->
+                                    progressBar.visibility = View.GONE
+                                    registerButton.isEnabled = true
+                                    Toast.makeText(this, "Firestore Error: ${e.message}", Toast.LENGTH_LONG).show()
+                                }
                         }
-                        // Even if Firebase fails, we have SQLite
+                    } else {
                         progressBar.visibility = View.GONE
-                        Toast.makeText(this, "Registration Successful", Toast.LENGTH_SHORT).show()
-                        startActivity(Intent(this, LoginActivity::class.java))
-                        finish()
+                        registerButton.isEnabled = true
+                        Toast.makeText(this, "Registration Failed: ${task.exception?.message}", Toast.LENGTH_LONG).show()
                     }
-            } else {
-                progressBar.visibility = View.GONE
-                registerButton.isEnabled = true
-                Toast.makeText(this, "Registration failed or email already exists", Toast.LENGTH_SHORT).show()
-            }
+                }
         }
 
         loginText.setOnClickListener {

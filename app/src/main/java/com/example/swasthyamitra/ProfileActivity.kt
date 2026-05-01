@@ -27,6 +27,7 @@ class ProfileActivity : AppCompatActivity() {
         val weightEditText = findViewById<EditText>(R.id.weightEditText)
         val heightEditText = findViewById<EditText>(R.id.heightEditText)
         val startButton = findViewById<Button>(R.id.startButton)
+        val btnHealthDetails = findViewById<Button>(R.id.btnHealthDetails)
 
         val currentUser = auth.currentUser
 
@@ -51,6 +52,13 @@ class ProfileActivity : AppCompatActivity() {
                     nameText.text = "Name: $name"
                     genderText.text = "Gender: $gender"
 
+                    // Store for Chatbot
+                    val sessionPref = getSharedPreferences("UserSession", Context.MODE_PRIVATE)
+                    sessionPref.edit().putString("userName", name).apply()
+
+                    val healthPref = getSharedPreferences("HealthDetails", Context.MODE_PRIVATE)
+                    healthPref.edit().putString("gender", gender).apply()
+
                     if (dob.isNotEmpty()) {
                         try {
                             val parts = dob.split("/")
@@ -66,6 +74,7 @@ class ProfileActivity : AppCompatActivity() {
                                 age--
                             }
                             ageText.text = "Age: $age"
+                            sessionPref.edit().putString("userAge", age.toString()).apply()
                         } catch (e: Exception) {
                             ageText.text = "Age: Error"
                         }
@@ -90,6 +99,11 @@ class ProfileActivity : AppCompatActivity() {
                 
                 startActivity(Intent(this, DashboardActivity::class.java))
             }
+        }
+
+        btnHealthDetails.setOnClickListener {
+            val intent = Intent(this, HealthDetailsActivity1::class.java)
+            startActivity(intent)
         }
     }
 }

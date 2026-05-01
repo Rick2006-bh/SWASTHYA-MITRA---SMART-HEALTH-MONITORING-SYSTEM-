@@ -201,4 +201,17 @@
         app:backgroundTint="@null"
         app:layout_constraintTop_toBottomOf="@id/heightContainer" />
 
+    <Button
+        android:id="@+id/btnHealthDetails"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/teal_button_bg"
+        android:text="USER HEALTH DETAILS"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:backgroundTint="@null"
+        app:layout_constraintTop_toBottomOf="@id/startButton" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

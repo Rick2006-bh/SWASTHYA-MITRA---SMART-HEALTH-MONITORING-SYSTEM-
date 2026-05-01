@@ -8,6 +8,9 @@ import android.os.Looper
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
@@ -26,6 +29,7 @@ class DashboardActivity : AppCompatActivity() {
     private lateinit var respiratoryRateText: TextView
     private lateinit var heightText: TextView
     private lateinit var viewReportButton: Button
+    private lateinit var backButton: Button
     private lateinit var dbHelper: DatabaseHelper
     
     private val client = OkHttpClient()
@@ -50,7 +54,15 @@ class DashboardActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         setContentView(R.layout.activity_dashboard)
+
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.dashboardRoot)) { view, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
 
         dbHelper = DatabaseHelper(this)
 
@@ -64,13 +76,28 @@ class DashboardActivity : AppCompatActivity() {
         respiratoryRateText = findViewById(R.id.respiratoryRateText)
         heightText = findViewById(R.id.heightText)
         viewReportButton = findViewById(R.id.viewReportButton)
+        backButton = findViewById(R.id.backButton)
 
         loadUserData()
-        handler.post(fetchDataRunnable)
 
         viewReportButton.setOnClickListener {
+            viewReportButton.isEnabled = false // Prevent double-click hang
             saveDataAndOpenReport()
         }
+
+        backButton.setOnClickListener {
+            onBackPressed()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        handler.post(fetchDataRunnable)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        handler.removeCallbacks(fetchDataRunnable)
     }
 
     private fun loadUserData() {
@@ -147,25 +174,25 @@ class DashboardActivity : AppCompatActivity() {
         val email = sharedPref.getString("userEmail", "Unknown") ?: "Unknown"
         val date = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
 
-        dbHelper.addHealthRecord(
-            email, date, currentHeartRate, currentSpo2, currentTemp, 
-            currentBmi, currentEcg, currentStress, currentRespiratory, currentHeight
-        )
-
-        val intent = Intent(this, AIReportActivity::class.java)
-        intent.putExtra("heartRate", currentHeartRate)
-        intent.putExtra("spo2", currentSpo2)
-        intent.putExtra("temp", currentTemp)
-        intent.putExtra("bmi", currentBmi)
-        intent.putExtra("ecg", currentEcg)
-        intent.putExtra("stress", currentStress)
-        intent.putExtra("respiratory", currentRespiratory)
-        intent.putExtra("height", currentHeight)
-        startActivity(intent)
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacks(fetchDataRunnable)
+        // Use a background thread for DB operations to avoid UI hang
+        Thread {
+            dbHelper.addHealthRecord(
+                email, date, currentHeartRate, currentSpo2, currentTemp, 
+                currentBmi, currentEcg, currentStress, currentRespiratory, currentHeight
+            )
+            
+            runOnUiThread {
+                val intent = Intent(this, AIReportActivity::class.java)
+                intent.putExtra("heartRate", currentHeartRate)
+                intent.putExtra("spo2", currentSpo2)
+                intent.putExtra("temp", currentTemp)
+                intent.putExtra("bmi", currentBmi)
+                intent.putExtra("ecg", currentEcg)
+                intent.putExtra("stress", currentStress)
+                intent.putExtra("respiratory", currentRespiratory)
+                intent.putExtra("height", currentHeight)
+                startActivity(intent)
+            }
+        }.start()
     }
 }
